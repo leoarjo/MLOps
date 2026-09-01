@@ -1,0 +1,10 @@
+services:
+  treino:
+    build: .
+    volumes:
+      # bind mounts: o container enxerga as pastas do host em tempo real
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+      # monte src/ também para editar .py sem rebuildar a imagem
+      - ./src:/app/src
+    command: uv run python -m churn.model

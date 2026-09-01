@@ -1,0 +1,28 @@
+# Git
+.git/
+.gitignore
+
+# ambientes locais
+.venv/
+env/
+venv/
+.env
+
+# caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# dados e artefatos: chegam por volume, nunca dentro da imagem
+data/
+artifacts/
+*.pkl
+*.csv
+
+# o que não é necessário para treinar
+tests/
+Dockerfile
+.dockerignore
+compose.yml
