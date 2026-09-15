@@ -22,8 +22,8 @@ def evaluate(
 ) -> dict[str, float]:
     """Calcula as métricas de classificação binária.
 
-    Só ``accuracy`` (a única do script original) engana num dataset com ~26%
-    de churn: um modelo que chuta "No" para todo mundo acerta 74%. Por isso
+    Só ``accuracy`` (a única do script original) engana num dataset com ~33%
+    de churn: um modelo que chuta "No" para todo mundo acerta 67%. Por isso
     ``recall`` e ``roc_auc`` entram aqui.
     """
     predictions = model.predict(features)
