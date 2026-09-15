@@ -21,6 +21,12 @@ artifacts/
 *.pkl
 *.csv
 
+# DVC: cache local e metadados do pipeline não são necessários para treinar
+.dvc/
+.dvcignore
+dvc.yaml
+dvc.lock
+
 # o que não é necessário para treinar
 tests/
 Dockerfile

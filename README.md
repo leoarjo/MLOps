@@ -3,14 +3,14 @@
 Repositório da disciplina de MLOps (IESB). Projeto-fio-condutor: previsão de
 **churn** (classificação binária tabular).
 
-Esta branch (`refactor/estrutura`) reúne o Bloco 0 e a primeira metade do
-Bloco 1:
+Estado do projeto por encontro:
 
 | Encontro | Tema | O que entrou no projeto |
 |---|---|---|
 | 2 | Git e estrutura | `train_churn.py` → módulos em `src/churn/`, config Pydantic, `pyproject.toml` + `uv.lock`, testes |
 | 3 | Docker | `Dockerfile` (uv), `.dockerignore`, `compose.yml` com volumes |
 | 4 | Data Pipeline — validação | profiling, contratos pandera (`schema.py`) no `data.py`, testes que quebram o dado de propósito |
+| 5 | Data Pipeline — DVC | `churn.csv` fora do Git (ponteiro `.dvc`), remote local, pipeline `dvc.yaml` |
 
 ## Estrutura
 
@@ -25,8 +25,11 @@ MLOps/
 │  ├─ evaluate.py    # métricas
 │  └─ model.py       # treino (entrypoint)
 ├─ tests/            # pytest
-├─ data/             # dataset
-├─ artifacts/        # modelo treinado (fora do Git)
+├─ data/
+│  └─ churn.csv.dvc  # ponteiro do dataset (os bytes ficam no DVC)
+├─ artifacts/        # modelo treinado (fora do Git, saída do dvc.yaml)
+├─ dvc.yaml          # pipeline reproduzível: dado + código -> modelo
+├─ dvc.lock          # hashes da última execução do pipeline
 ├─ Dockerfile        # imagem de treino
 ├─ compose.yml       # treino com volumes, sem decorar flags
 └─ pyproject.toml    # dependências (travadas no uv.lock)
@@ -96,6 +99,61 @@ fazem o mesmo de forma automatizada.
 | `modelo_final_v3_ok.pkl` na raiz | `artifacts/churn_model.pkl` (modelo + encoder) |
 | tudo em nível de módulo | funções puras + orquestração em `train()` |
 
+## Versionamento de dados (Encontro 5 — DVC)
+
+O `data/churn.csv` **não está mais no Git**. O Git guarda só o ponteiro
+`data/churn.csv.dvc` (md5 + tamanho); os bytes moram no cache `.dvc/cache` e
+no remote. O DVC entra como dependência de desenvolvimento (`uv sync` instala).
+
+Remote configurado: `local`, uma pasta **ao lado** do repositório
+(`../dvc-remote`). Depois de clonar, crie o remote ou aponte para outro:
+
+```bash
+uv run dvc pull                                   # baixa o churn.csv exato do ponteiro
+uv run dvc remote modify local url /outro/caminho # se o remote estiver em outro lugar
+```
+
+### Pipeline reproduzível
+
+`dvc.yaml` descreve o treino: depende de `data/churn.csv` e `src/churn`, produz
+`artifacts/churn_model.pkl`. O `dvc.lock` registra os hashes da última execução.
+
+```bash
+uv run dvc repro     # só re-treina se dado ou código mudaram
+uv run dvc status    # mostra o que está desatualizado
+uv run dvc push      # envia dado e modelo para o remote
+```
+
+### Versões do dado e alternância (tarefa de casa)
+
+A v2 acrescentou 100 clientes ao fim do CSV (IDs `14043` a `14142`). O commit
+`dados v2` amarra o ponteiro novo **e** o `dvc.lock` do modelo re-treinado —
+é a linhagem dado → código → modelo do slide 11.
+
+| versão | clientes | md5 | commit | modelo (accuracy · recall · roc_auc) |
+|---|---|---|---|---|
+| v1 | 7.043 | `d390bd07b5514a2256a2396993b8b0e3` | `05ca963` | 0.7570 · 0.5602 · 0.8053 |
+| v2 | 7.143 | `ca5c74c93b9748bed30992d64be8ce7c` | `8cee22b` (`dados v2`) | 0.7609 · 0.5704 · 0.8150 |
+
+```bash
+# registrar uma nova versão depois de alterar o data/churn.csv
+uv run dvc add data/churn.csv
+uv run dvc repro                   # re-treina e atualiza o dvc.lock
+git commit -am "dados vN"
+uv run dvc push
+
+# voltar para a v1 (acha o commit com: git log --oneline -- data/churn.csv.dvc)
+git checkout 05ca963 -- data/churn.csv.dvc
+uv run dvc checkout                # churn.csv volta a ter 7.043 clientes
+
+# retornar para a versão do commit atual (v2)
+git checkout HEAD -- data/churn.csv.dvc
+uv run dvc checkout
+```
+
+Regra: **`dvc push` sempre depois do commit** — senão o Git tem o ponteiro e o
+remote não tem os bytes.
+
 ## Próximo encontro
 
-- **Enc. 5** — versionar `data/churn.csv` com DVC (branch `feat/dvc`).
+- **Enc. 6** — MLflow: rastrear experimentos (o ML Pipeline acende).
