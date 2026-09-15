@@ -8,6 +8,7 @@ No Encontro 3, dentro do container, vira ``uv run python -m churn.model``.
 """
 from __future__ import annotations
 
+import logging
 import pickle
 from pathlib import Path
 
@@ -74,6 +75,7 @@ def train(cfg: Settings = settings) -> tuple[RandomForestClassifier, dict[str, f
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     _, metrics = train()
     print("Modelo treinado. Métricas no conjunto de teste:")
     for name, value in metrics.items():

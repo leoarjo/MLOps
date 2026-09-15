@@ -7,14 +7,23 @@ A validação é feita em dois pontos (Encontro 4): o ``RawChurnSchema`` olha o
 CSV como ele chega, o ``ChurnSchema`` confere o resultado da limpeza antes de
 o dado virar feature. Se qualquer um dos contratos falhar, o pipeline para
 antes do treino — barulhento e específico, em vez de silencioso.
+
+Quando um contrato falha, os ``failure_cases`` (coluna, regra, valor) vão
+para o log antes de a exceção subir — é o "logar os failure_cases" do
+slide 11: quem investiga o incidente não precisa reproduzir o erro.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pandas as pd
+import pandera.errors as pae
+import pandera.pandas as pa
 
 from churn.schema import ChurnSchema, RawChurnSchema
+
+logger = logging.getLogger(__name__)
 
 
 def load_raw(path: Path) -> pd.DataFrame:
@@ -41,6 +50,21 @@ def coerce_total_charges(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def validate(schema: type[pa.DataFrameModel], df: pd.DataFrame) -> pd.DataFrame:
+    """Aplica um contrato; se falhar, loga cada violação e relança o erro."""
+    try:
+        return schema.validate(df, lazy=True)
+    except pae.SchemaErrors as err:
+        cases = err.failure_cases
+        logger.error(
+            "%s: %d violação(ões) do contrato de dados\n%s",
+            schema.__name__,
+            len(cases),
+            cases[["column", "check", "failure_case", "index"]].to_string(index=False),
+        )
+        raise
+
+
 def load_clean(data_path: Path, id_column: str, target: str) -> pd.DataFrame:
     """Pipeline de dados: carrega -> valida cru -> limpa -> valida limpo.
 
@@ -52,9 +76,9 @@ def load_clean(data_path: Path, id_column: str, target: str) -> pd.DataFrame:
     checagem do alvo agora vive declarada no schema.
     """
     df = load_raw(data_path)
-    df = RawChurnSchema.validate(df, lazy=True)
+    df = validate(RawChurnSchema, df)
 
     df = drop_identifier(df, id_column)
     df = coerce_total_charges(df)
 
-    return ChurnSchema.validate(df, lazy=True)
+    return validate(ChurnSchema, df)

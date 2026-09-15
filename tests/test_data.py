@@ -38,3 +38,15 @@ def test_load_clean_para_o_pipeline_com_dado_sujo(tmp_path, raw_frame):
 
     with pytest.raises(pae.SchemaErrors):
         load_clean(csv, "customerID", "Churn")
+
+
+def test_load_clean_loga_os_failure_cases(tmp_path, raw_frame, caplog):
+    sujo = raw_frame.copy()
+    sujo.loc[0, "tenure"] = 999
+    csv = tmp_path / "sujo.csv"
+    sujo.to_csv(csv, index=False)
+
+    with pytest.raises(pae.SchemaErrors):
+        load_clean(csv, "customerID", "Churn")
+    assert "RawChurnSchema" in caplog.text
+    assert "tenure" in caplog.text and "999" in caplog.text

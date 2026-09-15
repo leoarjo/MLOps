@@ -20,6 +20,8 @@ def test_dado_valido_passa(limpo):
     assert len(validado) == len(limpo)
 
 
+# tenure=999 também quebra a relação com TotalCharges: o alerta é esperado.
+@pytest.mark.filterwarnings("ignore::pandera.errors.SchemaWarning")
 def test_tenure_fora_da_faixa_falha(limpo):
     quebrado = limpo.copy()
     quebrado.loc[0, "tenure"] = 999
@@ -36,6 +38,7 @@ def test_categoria_desconhecida_falha(limpo):
     assert "Contract" in exc.value.failure_cases["column"].values
 
 
+@pytest.mark.filterwarnings("ignore::pandera.errors.SchemaWarning")
 def test_lazy_coleta_todas_as_falhas(limpo):
     """Com lazy=True o relatório traz as duas violações, não só a primeira."""
     quebrado = limpo.copy()
@@ -45,6 +48,15 @@ def test_lazy_coleta_todas_as_falhas(limpo):
         ChurnSchema.validate(quebrado, lazy=True)
     colunas = set(exc.value.failure_cases["column"])
     assert {"tenure", "MonthlyCharges"} <= colunas
+
+
+def test_total_incoerente_com_mensalidade_gera_alerta(limpo):
+    """Relação de negócio: avisa, mas não derruba o pipeline."""
+    quebrado = limpo.copy()
+    quebrado.loc[0, "TotalCharges"] = 5_000.0  # esperado ≈ 12 × 55.5 = 666
+    with pytest.warns(pae.SchemaWarning):
+        validado = ChurnSchema.validate(quebrado, lazy=True)
+    assert len(validado) == len(quebrado)
 
 
 def test_id_duplicado_falha_no_schema_cru(raw_frame):

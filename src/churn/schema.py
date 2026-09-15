@@ -13,7 +13,7 @@ Há dois schemas, aplicados em pontos distintos do pipeline:
 
 ``ChurnSchema``
     valida o DataFrame já limpo, imediatamente antes de virar features.
-    Tipos, faixas e categorias.
+    Tipos, faixas, categorias e a relação entre as colunas de valor.
 
 Validar nos dois pontos é o que impede que ``coerce=True`` mascare sujeira
 real: o schema cru vê o dado como ele é, o schema limpo confere o resultado
@@ -25,8 +25,12 @@ linhas): tenure 0–72, MonthlyCharges 18.25–118.75, TotalCharges 0–8269.27,
 """
 from __future__ import annotations
 
+import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
+
+# desvio relativo aceito em TotalCharges ≈ tenure × MonthlyCharges
+TOLERANCIA_TOTAL = 0.06
 
 # --- categorias observadas no dataset ---
 SIM_NAO = ["Yes", "No"]
@@ -87,6 +91,20 @@ class ChurnSchema(pa.DataFrameModel):
 
     # --- alvo ---
     Churn: Series[str] = pa.Field(isin=SIM_NAO, nullable=False)
+
+    # --- relações entre colunas ---
+    @pa.dataframe_check(raise_warning=True)
+    @classmethod
+    def total_coerente_com_mensalidade(cls, df: pd.DataFrame) -> Series[bool]:
+        """``TotalCharges ≈ tenure × MonthlyCharges`` (slide 8, "relações").
+
+        No profiling a razão fica entre 0.97 e 1.03 (a mensalidade varia um
+        pouco ao longo do contrato). A tolerância é o dobro disso, e a regra
+        emite ALERTA em vez de erro: é uma relação de negócio aproximada, não
+        um tipo ou uma faixa — desvio aqui pede investigação, não parar tudo.
+        """
+        esperado = df["tenure"] * df["MonthlyCharges"]
+        return (df["TotalCharges"] - esperado).abs() <= TOLERANCIA_TOTAL * esperado
 
     class Config:
         coerce = True    # converte tipos ao validar (TotalCharges texto -> float)
