@@ -1,0 +1,11 @@
+# Pipeline reproduzível (Encontro 5, slide 12).
+# `uv run dvc repro` só re-executa o treino se o dado ou o código mudarem,
+# e grava no dvc.lock os hashes exatos de entradas e saídas.
+stages:
+  treino:
+    cmd: uv run python -m churn.model
+    deps:
+      - data/churn.csv
+      - src/churn
+    outs:
+      - artifacts/churn_model.pkl

@@ -1,0 +1,8 @@
+# Add patterns of files dvc should ignore, which could improve
+# the performance. Learn more at
+# https://dvc.org/doc/user-guide/dvcignore
+
+# bytecode muda entre máquinas/versões do Python: não pode invalidar o
+# hash de src/churn e forçar um re-treino no dvc repro
+__pycache__/
+*.py[cod]
