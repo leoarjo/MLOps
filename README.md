@@ -124,29 +124,35 @@ uv run dvc status    # mostra o que está desatualizado
 uv run dvc push      # envia dado e modelo para o remote
 ```
 
-### Nova versão do dado e alternância (tarefa de casa)
+### Versões do dado e alternância (tarefa de casa)
+
+A v2 acrescentou 100 clientes ao fim do CSV (IDs `14043` a `14142`). O commit
+`dados v2` amarra o ponteiro novo **e** o `dvc.lock` do modelo re-treinado —
+é a linhagem dado → código → modelo do slide 11.
+
+| versão | clientes | md5 | commit | modelo (accuracy · recall · roc_auc) |
+|---|---|---|---|---|
+| v1 | 7.043 | `d390bd07b5514a2256a2396993b8b0e3` | `05ca963` | 0.7570 · 0.5602 · 0.8053 |
+| v2 | 7.143 | `ca5c74c93b9748bed30992d64be8ce7c` | `8cee22b` (`dados v2`) | 0.7609 · 0.5704 · 0.8150 |
 
 ```bash
-# v2: altere o data/churn.csv e registre
+# registrar uma nova versão depois de alterar o data/churn.csv
 uv run dvc add data/churn.csv
-git commit -am "dados v2"
+uv run dvc repro                   # re-treina e atualiza o dvc.lock
+git commit -am "dados vN"
 uv run dvc push
 
-# voltar para a v1
-git checkout HEAD~1 -- data/churn.csv.dvc
-uv run dvc checkout            # churn.csv volta a ter 7.043 clientes
+# voltar para a v1 (acha o commit com: git log --oneline -- data/churn.csv.dvc)
+git checkout 05ca963 -- data/churn.csv.dvc
+uv run dvc checkout                # churn.csv volta a ter 7.043 clientes
 
-# retornar para a v2
+# retornar para a versão do commit atual (v2)
 git checkout HEAD -- data/churn.csv.dvc
 uv run dvc checkout
 ```
 
 Regra: **`dvc push` sempre depois do commit** — senão o Git tem o ponteiro e o
 remote não tem os bytes.
-
-| versão | linhas de dados | md5 |
-|---|---|---|
-| v1 | 7.043 | `d390bd07b5514a2256a2396993b8b0e3` |
 
 ## Próximo encontro
 
