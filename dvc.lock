@@ -9,8 +9,8 @@ stages:
       size: 981685
     - path: src/churn
       hash: md5
-      md5: c8f16d44722eca3aaefa57a0641643ee.dir
-      size: 18239
+      md5: 34dda783fa190a3419dd0c6384120be4.dir
+      size: 17800
       nfiles: 8
     outs:
     - path: artifacts/churn_model.pkl
