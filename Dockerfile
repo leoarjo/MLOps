@@ -6,6 +6,11 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 # sistemas de arquivos diferentes (o caso normal dentro de container).
 ENV UV_LINK_MODE=copy
 
+# O ambiente é congelado no build. Sem isto, o `uv run` do CMD (e do
+# compose.yml) re-sincroniza a cada `docker run` e baixa o grupo dev
+# (pytest, dvc): container lento, dependente de internet e diferente da imagem.
+ENV UV_NO_SYNC=1
+
 WORKDIR /app
 
 # --- camada 1: dependências ---
