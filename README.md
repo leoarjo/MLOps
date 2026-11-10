@@ -14,6 +14,7 @@ Estado do projeto por encontro:
 | 6 | ML Pipeline — tracking | `mlflow` no `train()`, `lineage.py` (tags de dado e commit), grid em `experiments.py` |
 | 7 | ML Pipeline — registry | `registry.py`: melhor run → `churn` v1, alias `@champion`, gate de `roc_auc` |
 | 8 | ML Pipeline — empacotamento | `signature` + `input_example` + cloudpickle, consumo por `models:/churn@champion` |
+| 12 | Serving | `export.py` (champion → bundle), API FastAPI, front Streamlit, `Dockerfile.serve` + deploy no EC2 |
 
 ## Estrutura
 
@@ -30,7 +31,11 @@ MLOps/
 │  ├─ lineage.py     # tags de linhagem: md5 do dado e commit do código
 │  ├─ experiments.py # o grid de 9 runs (entrypoint)
 │  ├─ registry.py    # melhor run -> registro -> alias @champion (entrypoint)
-│  └─ predict.py     # consome models:/churn@champion (entrypoint)
+│  ├─ predict.py     # consome models:/churn@champion (entrypoint)
+│  ├─ export.py      # champion -> artifacts/champion/ servível (entrypoint)
+│  ├─ serving.py     # contrato de entrada (Pydantic) + bundle + inferência
+│  ├─ api.py         # FastAPI: /health, /model, /predict, /predict/batch
+│  └─ frontend.py    # Streamlit: formulário do cliente + lote por CSV
 ├─ tests/            # pytest
 ├─ data/
 │  └─ churn.csv.dvc  # ponteiro do dataset (os bytes ficam no DVC)
@@ -41,6 +46,10 @@ MLOps/
 ├─ mlruns/           # artefatos dos runs (fora do Git)
 ├─ Dockerfile        # imagem de treino
 ├─ compose.yml       # treino com volumes, sem decorar flags
+├─ Dockerfile.serve  # imagem de serving: API + front + champion
+├─ compose.serve.yml # sobe api (:8000) e front (:8501)
+├─ deploy/           # user data do EC2
+├─ docs/             # guia de deploy no EC2
 └─ pyproject.toml    # dependências (travadas no uv.lock)
 ```
 
@@ -251,13 +260,69 @@ model = mlflow.pyfunc.load_model("models:/churn@champion")
 model.predict(features)
 ```
 
-`pyfunc` e não `sklearn`: é o contrato universal (só `predict(df)`), o mesmo
-que a API do Encontro 12 vai consumir.
+`pyfunc` e não `sklearn`: é o contrato universal (só `predict(df)`). A API do
+Encontro 12 carrega o flavor `sklearn` do mesmo pacote porque precisa de
+`predict_proba`: ela devolve a probabilidade, não só o 0/1.
 
 ⚠️ **O champion espera features já codificadas.** O encoder não faz parte do
 objeto sklearn, então vai como artefato `encoder/encoder.pkl` em cada run e
-quem consome aplica a mesma transformação do treino. Fechar esse buraco de vez
-(um wrapper `pyfunc` que embute o encoder) é tarefa do Encontro 12.
+quem consome aplica a mesma transformação do treino. No serving (abaixo) esse
+cuidado mora num lugar só: `serving.ModelBundle`.
+
+## Serving (Encontro 12) — API, front e deploy
+
+```bash
+uv run python -m churn.export                         # champion -> artifacts/champion/
+uv run uvicorn churn.api:app --port 8000              # API  (docs em /docs)
+uv run streamlit run src/churn/frontend.py            # front em :8501
+# ou os dois em container:
+docker compose -f compose.serve.yml up --build
+```
+
+```
+ Streamlit (:8501) ──registro completo (JSON)──▶ FastAPI (:8000) ──▶ ModelBundle
+   formulário / CSV                                 contrato Pydantic       encoder + RF
+```
+
+**Export, não registry, em produção.** O `churn.export` resolve o
+`models:/churn@champion` e grava uma pasta autocontida: o pacote MLflow como
+foi registrado (com signature), o `encoder.pkl` do run e um `metadata.json` com
+versão, run, roc_auc, `data_md5` e `git_commit`. A API lê só essa pasta, e a
+pasta entra na imagem. O container não depende do `mlflow.db`, e a imagem
+identifica sozinha qual modelo está servindo.
+
+**Contrato de entrada.** `serving.CustomerRecord` é o registro inteiro do
+cliente, isto é, as 19 colunas do `churn.csv` menos o alvo. As categorias vêm do próprio
+`schema.py`, então API e dado de treino não divergem. Um campo fora do
+contrato vira **422** apontando campo e valor, antes de o modelo ser tocado.
+`customerID` é opcional e volta na resposta. Colunas extras (como `Churn`) são
+ignoradas.
+
+**Mesma transformação do treino.** O `ModelBundle.predict` usa as funções de
+`features.py` (não uma cópia) e reordena as colunas pelo `feature_names_in_`
+do modelo. O teste `test_batch_preserva_ordem_e_bate_com_o_modelo` cobre isso;
+no dado real, API e `prepare()` dão a mesma probabilidade nas 1761 linhas de
+teste.
+
+| rota | o quê |
+|---|---|
+| `GET /health` | liveness (healthcheck do compose) |
+| `GET /model` | versão do champion, run, linhagem e limiar |
+| `POST /predict` | um `CustomerRecord` → `{customerID, churn_probability, churn}` |
+| `POST /predict/batch` | `{"records": [...]}` (até 10.000) → lista na mesma ordem |
+
+O **front** não carrega modelo nenhum: monta o registro (com os campos
+dependentes coerentes; sem internet → `No internet service`), chama a API e
+mostra a probabilidade. Na aba de lote ele aceita um CSV no formato do
+`churn.csv` e, se houver coluna `Churn`, compara previsto × real.
+
+**Duas imagens.** `Dockerfile` treina (`--no-default-groups`: sem
+FastAPI/Streamlit). `Dockerfile.serve` serve (`--group serve`: sem dvc/pytest)
+e é a única que leva `artifacts/champion/`, liberado no
+`Dockerfile.serve.dockerignore`. O modelo é a última camada: promover um
+champion novo rebuilda em segundos.
+
+Deploy no EC2: [`docs/deploy-ec2.md`](docs/deploy-ec2.md).
 
 ## Próximo encontro
 
