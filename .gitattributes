@@ -1,0 +1,5 @@
+# Finais de linha LF em qualquer sistema operacional.
+# O DVC calcula o md5 dos bytes: se o Git converter para CRLF no Windows, o
+# hash de src/churn muda a cada clone e o `dvc repro` re-treina sem motivo.
+* text=auto eol=lf
+*.pkl binary
