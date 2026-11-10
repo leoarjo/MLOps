@@ -1,0 +1,47 @@
+# .dockerignore da imagem de serving. O BuildKit usa <Dockerfile>.dockerignore
+# no lugar do .dockerignore quando o build é feito com -f Dockerfile.serve.
+#
+# Diferença para o .dockerignore do treino: aqui o champion exportado ENTRA
+# na imagem (artifacts/champion/), e só ele.
+
+# Git
+.git/
+.gitignore
+
+# ambientes locais
+.venv/
+env/
+venv/
+.env
+
+# caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# dados nunca entram; dos artefatos, só o bundle do champion
+data/
+*.csv
+artifacts/*
+!artifacts/champion/
+
+# DVC e MLflow: o serving não lê o registry, lê o bundle
+.dvc/
+.dvcignore
+dvc.yaml
+dvc.lock
+mlflow.db
+mlruns/
+mlartifacts/
+
+# o que não é necessário para servir
+tests/
+deploy/
+docs/
+Dockerfile
+Dockerfile.serve
+*.dockerignore
+compose.yml
+compose.serve.yml

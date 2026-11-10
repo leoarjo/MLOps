@@ -38,3 +38,11 @@ tests/
 Dockerfile
 .dockerignore
 compose.yml
+
+# serving (Encontro 12): tem imagem própria, com Dockerfile.serve
+Dockerfile.serve
+*.dockerignore
+compose.serve.yml
+.streamlit/
+deploy/
+docs/
