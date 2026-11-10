@@ -10,10 +10,13 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "pandera>=0.33.0",
+    "mlflow>=3.18.0",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
 dev = [
+    "dvc>=3.67.1",
     "pytest>=8.0",
 ]
 
