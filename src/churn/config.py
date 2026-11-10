@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     # gate de promoção: abaixo disto o modelo não vira champion (slide 28)
     min_roc_auc: float = 0.80
 
+    # --- Serving (Encontro 12) ---
+    # O bundle é o champion exportado do registry (``python -m churn.export``):
+    # modelo MLflow + encoder + metadados numa pasta só. A API lê daqui e não
+    # precisa do mlflow.db — é isso que deixa o container de produção sem
+    # depender do servidor de tracking.
+    model_dir: Path = Path("artifacts/champion")
+    # probabilidade a partir da qual o cliente é classificado como churn
+    decision_threshold: float = 0.5
+    # onde o front-end (Streamlit) encontra a API
+    api_url: str = "http://localhost:8000"
+
     def hyperparams(self) -> dict[str, object]:
         """Só o que é hiperparâmetro — o que vai para ``log_params``.
 
