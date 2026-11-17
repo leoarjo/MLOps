@@ -1,0 +1,19 @@
+schema: '2.0'
+stages:
+  treino:
+    cmd: python -m churn.model
+    deps:
+    - path: data/churn.csv
+      hash: md5
+      md5: ca5c74c93b9748bed30992d64be8ce7c
+      size: 995054
+    - path: src/churn
+      hash: md5
+      md5: b5a6b27b6ee7c7da009bc6aaab800b89.dir
+      size: 36631
+      nfiles: 12
+    outs:
+    - path: artifacts/churn_model.pkl
+      hash: md5
+      md5: 975e7a864ed247b59983785302a614d6
+      size: 34812726

@@ -21,6 +21,18 @@ artifacts/
 *.pkl
 *.csv
 
+# DVC: cache local e metadados do pipeline não são necessários para treinar
+.dvc/
+.dvcignore
+dvc.yaml
+dvc.lock
+
+# MLflow: o backend local e os artefatos dos runs não entram na imagem.
+# Dentro do container o tracking aponta para fora (CHURN_TRACKING_URI).
+mlflow.db
+mlruns/
+mlartifacts/
+
 # o que não é necessário para treinar
 tests/
 Dockerfile

@@ -1,0 +1,25 @@
+# Pipeline reproduzível (Encontro 5, slide 12).
+# `uv run dvc repro` só re-executa o treino se o dado ou o código mudarem,
+# e grava no dvc.lock os hashes exatos de entradas e saídas.
+#
+# Encontro 6 (passo 7): o stage continua sendo só o treino. Cada `dvc repro`
+# agora também abre um run no MLflow, então o pipeline reproduzível e o
+# histórico de experimentos ficam ligados pelas tags data_md5 e git_commit.
+#
+# O grid (`churn.experiments`) e a promoção (`churn.registry`) NÃO são stages
+# de propósito: a saída dos dois vive no mlflow.db, um binário que muda a cada
+# execução. Declarar isso como `outs` faria o DVC versionar um blob opaco —
+# exatamente o que o Encontro 5 ensina a não fazer. Explorar e promover são
+# decisões humanas; o pipeline reproduzível é o treino.
+#
+# O cmd é `python`, não `uv run python`: o DVC executa o stage num shell que
+# não herda o diretório do uv, e `uv run` falhava com "'uv' nao e reconhecido".
+# Rode sempre `uv run dvc repro` — aí o `python` do stage já é o do .venv.
+stages:
+  treino:
+    cmd: python -m churn.model
+    deps:
+      - data/churn.csv
+      - src/churn
+    outs:
+      - artifacts/churn_model.pkl
