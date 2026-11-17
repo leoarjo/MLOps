@@ -18,14 +18,14 @@ WORKDIR /app
 # reaproveita esta camada do cache e não reinstala nada — que é a razão de o
 # código vir depois. --no-install-project instala as deps sem o próprio churn.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-default-groups
 
 # --- camada 2: o projeto ---
 # README.md é obrigatório aqui: o pyproject.toml declara readme = "README.md",
 # e o hatchling recusa a build do wheel se o arquivo não estiver no contexto.
 COPY README.md ./
 COPY src/ ./src/
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-default-groups
 
 # data/ e artifacts/ NÃO entram na imagem — chegam por volume no docker run.
 # Isso mantém a imagem pequena e o dataset fora do artefato distribuído.

@@ -1,0 +1,47 @@
+# Imagem de SERVING (Encontro 12): API FastAPI + front Streamlit + o champion.
+#
+# É a mesma imagem para os dois serviços do compose.serve.yml; muda só o
+# comando. O Dockerfile de treino continua separado: treinar precisa de dado
+# e de MLflow tracking, servir precisa só do bundle exportado.
+#
+# Pré-requisito: `uv run python -m churn.export` (gera artifacts/champion/).
+# Build:  docker build -f Dockerfile.serve -t churn-serve .
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+ENV UV_LINK_MODE=copy \
+    UV_NO_SYNC=1 \
+    PYTHONUNBUFFERED=1 \
+    MLFLOW_DISABLE_AGENT_HINT=1 \
+    # o .venv no PATH dispensa o `uv run` em tempo de execução
+    PATH="/app/.venv/bin:$PATH"
+
+WORKDIR /app
+
+# --- camada 1: dependências (cache enquanto pyproject/uv.lock não mudam) ---
+# --no-default-groups tira dev (pytest, dvc); --group serve põe FastAPI,
+# uvicorn e Streamlit. O treino não leva nada disso, e o serving não leva dvc.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-default-groups --group serve
+
+# --- camada 2: o projeto ---
+COPY README.md ./
+COPY src/ ./src/
+COPY .streamlit/ ./.streamlit/
+RUN uv sync --frozen --no-default-groups --group serve
+
+# --- camada 3: o modelo ---
+# Por último de propósito: promover um champion novo só refaz esta camada.
+# O Dockerfile.serve.dockerignore libera artifacts/champion/ (o .dockerignore
+# padrão bloqueia artifacts/ inteiro, que é o certo para a imagem de treino).
+COPY artifacts/champion/ ./artifacts/champion/
+
+# Não rodar como root dentro do container. Sem `chown -R /app` de propósito:
+# o serving só LÊ o código e o modelo, e um chown recursivo copiaria o .venv
+# inteiro (~700 MB) para uma camada nova, dobrando o tamanho da imagem.
+RUN useradd --create-home --uid 1000 app
+USER app
+
+EXPOSE 8000 8501
+
+# default = API. O front sobrescreve o comando no compose.serve.yml.
+CMD ["uvicorn", "churn.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,49 @@
+# Serving: API + front, a partir da mesma imagem (Dockerfile.serve).
+#
+#   uv run python -m churn.export                       # 1x, gera o bundle
+#   docker compose -f compose.serve.yml up -d --build   # sobe os dois
+#
+#   front:  http://localhost:8501
+#   API:    http://localhost:8000/docs
+#
+# No EC2 é exatamente o mesmo comando (ver docs/deploy-ec2.md).
+
+x-serve-image: &serve-image
+  build:
+    context: .
+    dockerfile: Dockerfile.serve
+  # CHURN_IMAGE permite usar uma imagem já publicada (Docker Hub/ECR) em vez
+  # de buildar na máquina: CHURN_IMAGE=usuario/churn-serve:v1 ... up --no-build
+  image: ${CHURN_IMAGE:-churn-serve:latest}
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *serve-image
+    ports:
+      - "8000:8000"
+    environment:
+      CHURN_DECISION_THRESHOLD: "0.5"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  front:
+    <<: *serve-image
+    command:
+      - streamlit
+      - run
+      - src/churn/frontend.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      # dentro da rede do compose, a API é alcançada pelo nome do serviço
+      CHURN_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy

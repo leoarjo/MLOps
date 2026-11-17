@@ -19,6 +19,18 @@ dev = [
     "dvc>=3.67.1",
     "pytest>=8.0",
 ]
+serve = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "streamlit>=1.40",
+    "uvicorn[standard]>=0.30",
+]
+
+[tool.uv]
+# `uv sync` local instala tudo (treino + testes + serving). As imagens Docker
+# escolhem o grupo explicitamente: treino usa --no-default-groups, serving
+# usa --no-default-groups --group serve.
+default-groups = ["dev", "serve"]
 
 [build-system]
 requires = ["hatchling"]
