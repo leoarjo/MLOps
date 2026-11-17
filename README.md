@@ -324,6 +324,37 @@ champion novo rebuilda em segundos.
 
 Deploy no EC2: [`docs/deploy-ec2.md`](docs/deploy-ec2.md).
 
+## O que ainda não está aqui
+
+O **Bloco 3 (Encontros 9–11, orquestração com Airflow)** não foi implementado —
+daí a tabela do topo saltar do Encontro 8 para o 12. Hoje cada etapa do
+pipeline é disparada à mão:
+
+```bash
+uv run dvc repro                     # dado validado -> treino
+uv run python -m churn.experiments   # grid de experimentos
+uv run python -m churn.registry      # promoção com o gate de roc_auc
+uv run python -m churn.export        # bundle para o serving
+```
+
+É exatamente esse dedo no gatilho que o Airflow substituiria. O `dvc.yaml` já
+declara as dependências do treino (dado + código → modelo), então a migração
+seria encadear esses mesmos comandos num DAG e deixar o scheduler disparar.
+
+Também fora do escopo até aqui: CI/CD com GitHub Actions (Enc. 13–14) e
+monitoramento de drift (Enc. 15).
+
+### Dívida técnica conhecida
+
+- **O encoder não está dentro do pacote do modelo.** O champion é só o
+  classificador e espera features já codificadas; o `encoder.pkl` vai ao lado,
+  no bundle. A API aplica a transformação certa, mas quem carregasse
+  `models:/churn@champion` sozinho erraria. O fim disso é um wrapper `pyfunc`
+  que embuta o encoder.
+- **O remote do DVC é uma pasta local** (`../dvc-remote`), como o Encontro 5
+  recomenda para começar. Num clone em outra máquina o `dvc pull` não encontra
+  os dados — para isso o remote precisaria ir para S3 ou equivalente.
+
 ## Próximo encontro
 
 - **Bloco 3 (Enc. 9–11)** — Airflow: orquestrar dados → treino → avaliação.
